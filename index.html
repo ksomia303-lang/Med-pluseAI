@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedPulse AI — Intelligent Emergency Triage System | SUNHACKS 2K26</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <style>
+        :root {
+            --bg:#060b18;--surface:#0c1424;--card:#101d33;--border:#1a2d4a;
+            --accent:#00e5a0;--accent2:#00c4d4;
+            --critical:#ff3355;--urgent:#ff8c20;--semi:#ffd020;--non:#40d87a;
+            --text:#e4eaf4;--muted:#5a6e8a;
+        }
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh;}
+        h1,h2,h3,h4{font-family:'Syne',sans-serif;}
+
+        #loader{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .6s,visibility .6s;}
+        #loader.hidden{opacity:0;visibility:hidden;}
+        .loader-pulse{width:80px;height:80px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--accent);animation:spin 1s linear infinite;position:relative;}
+        .loader-pulse::after{content:'';position:absolute;inset:8px;border-radius:50%;border:2px solid var(--border);border-bottom-color:var(--accent2);animation:spin 1.5s linear reverse infinite;}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .loader-bar{width:200px;height:3px;background:var(--border);border-radius:2px;margin-top:24px;overflow:hidden;}
+        .loader-bar-fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;animation:loadBar 2s ease forwards;}
+        @keyframes loadBar{to{width:100%}}
+
+        .bg-grid{position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(0,229,160,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,160,.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;}
+        .bg-glow{position:fixed;z-index:0;pointer-events:none;width:600px;height:600px;border-radius:50%;filter:blur(150px);opacity:.12;}
+        .bg-glow-1{top:-200px;left:-100px;background:var(--accent);}
+        .bg-glow-2{bottom:-200px;right:-100px;background:var(--accent2);}
+
+        .app-container{position:relative;z-index:1;display:grid;grid-template-rows:auto 1fr auto auto;height:100vh;}
+        .main-grid{display:grid;grid-template-columns:280px 1fr 340px;gap:0;overflow:hidden;}
+
+        .app-header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid var(--border);background:rgba(6,11,24,.85);backdrop-filter:blur(12px);}
+        .logo-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--bg);font-weight:800;font-family:'Syne',sans-serif;}
+        .stat-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:18px;background:var(--card);border:1px solid var(--border);font-size:12px;font-weight:500;}
+        .stat-pill .val{color:var(--accent);font-weight:700;}
+        .status-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse-dot 2s ease infinite;}
+        @keyframes pulse-dot{0%,100%{box-shadow:0 0 0 0 rgba(0,229,160,.4)}50%{box-shadow:0 0 0 6px rgba(0,229,160,0)}}
+
+        .panel{padding:14px;border-right:1px solid var(--border);overflow-y:auto;background:rgba(12,20,36,.5);}
+        .panel:last-child{border-right:none;border-left:1px solid var(--border);}
+        .panel-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px;}
+
+        .region-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:7px;border:1px solid transparent;background:var(--card);cursor:pointer;transition:all .2s;color:var(--text);font-size:12px;font-family:inherit;margin-bottom:5px;text-align:left;}
+        .region-btn:hover{border-color:var(--border);background:var(--surface);}
+        .region-btn.active{border-color:var(--accent);background:rgba(0,229,160,.08);box-shadow:0 0 20px rgba(0,229,160,.1);}
+        .region-icon{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+
+        .symptom-item{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:5px;cursor:pointer;transition:background .15s;font-size:12px;}
+        .symptom-item:hover{background:rgba(255,255,255,.03);}
+        .symptom-check{width:15px;height:15px;border-radius:3px;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s;font-size:8px;color:transparent;}
+        .symptom-item.checked .symptom-check{border-color:var(--accent);background:var(--accent);color:var(--bg);}
+        .severity-badge{margin-left:auto;font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;}
+
+        .analyze-btn{width:100%;padding:10px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--bg);font-weight:700;font-size:13px;font-family:inherit;transition:all .3s;position:relative;overflow:hidden;}
+        .analyze-btn:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(0,229,160,.3);}
+        .analyze-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+        .analyze-btn .shimmer{position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent);animation:shimmer 2s infinite;}
+        @keyframes shimmer{to{left:100%}}
+
+        .canvas-container{position:relative;overflow:hidden;background:radial-gradient(ellipse at center,rgba(0,229,160,.03) 0%,transparent 70%);}
+        #three-canvas{display:block;width:100%;height:100%;}
+        .canvas-overlay{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:6px;}
+        .canvas-hint{padding:5px 12px;border-radius:16px;background:rgba(12,20,36,.8);border:1px solid var(--border);font-size:10px;color:var(--muted);backdrop-filter:blur(8px);}
+
+        .result-card{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:8px;opacity:0;transform:translateY(10px);transition:all .4s ease;}
+        .result-card.visible{opacity:1;transform:translateY(0);}
+        .triage-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:7px;font-weight:800;font-size:14px;letter-spacing:.5px;font-family:'Syne',sans-serif;}
+        .triage-critical{background:rgba(255,51,85,.15);color:var(--critical);border:1px solid rgba(255,51,85,.3);}
+        .triage-urgent{background:rgba(255,140,32,.15);color:var(--urgent);border:1px solid rgba(255,140,32,.3);}
+        .triage-semi{background:rgba(255,208,32,.15);color:var(--semi);border:1px solid rgba(255,208,32,.3);}
+        .triage-non{background:rgba(64,216,122,.15);color:var(--non);border:1px solid rgba(64,216,122,.3);}
+
+        .confidence-ring{width:54px;height:54px;position:relative;}
+        .confidence-ring svg{transform:rotate(-90deg);}
+        .confidence-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent);}
+
+        .action-item{display:flex;align-items:flex-start;gap:7px;padding:5px 0;font-size:11px;color:var(--text);border-bottom:1px solid rgba(26,45,74,.4);}
+        .action-item:last-child{border-bottom:none;}
+        .action-num{width:18px;height:18px;border-radius:50%;background:rgba(0,229,160,.15);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;}
+
+        .scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);box-shadow:0 0 15px var(--accent);animation:scanDown 1.5s ease-out forwards;pointer-events:none;z-index:10;}
+        @keyframes scanDown{0%{top:0;opacity:1}100%{top:100%;opacity:0}}
+
+        .bottom-bar{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-top:1px solid var(--border);background:rgba(12,20,36,.8);backdrop-filter:blur(12px);}
+        .metric-cell{padding:10px 14px;border-right:1px solid var(--border);}
+        .metric-cell:last-child{border-right:none;}
+        .metric-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+        .metric-value{font-size:18px;font-weight:700;font-family:'Syne',sans-serif;margin-top:1px;}
+
+        .time-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+        .time-box{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;}
+        .time-box .t-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+        .time-box .t-val{font-size:22px;font-weight:800;font-family:'Syne',sans-serif;margin-top:2px;}
+        .time-box .t-unit{font-size:10px;color:var(--muted);font-weight:400;}
+        .time-box.ai{border-color:rgba(0,229,160,.3);}
+        .time-box.ai .t-val{color:var(--accent);}
+        .time-box.manual{border-color:rgba(255,51,85,.3);}
+        .time-box.manual .t-val{color:var(--critical);}
+
+        /* Voice + Text Input Area */
+        .input-area{margin-bottom:10px;}
+        .voice-btn{width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px;}
+        .voice-btn:hover{border-color:var(--accent);background:rgba(0,229,160,.05);}
+        .voice-btn.listening{border-color:var(--critical);background:rgba(255,51,85,.1);animation:voice-pulse 1s ease infinite;}
+        @keyframes voice-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,51,85,.3)}50%{box-shadow:0 0 0 8px rgba(255,51,85,0)}}
+        .voice-btn i{font-size:13px;}
+        .text-input-wrap{margin-top:6px;position:relative;}
+        .text-input{width:100%;padding:8px 32px 8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;font-size:11px;outline:none;transition:border-color .2s;}
+        .text-input:focus{border-color:var(--accent);}
+        .text-input::placeholder{color:var(--muted);}
+        .text-submit{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:5px;border:none;background:var(--accent);color:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;}
+        .input-status{font-size:9px;color:var(--muted);text-align:center;margin-top:4px;min-height:13px;}
+
+        .chart-bar-container{display:flex;align-items:flex-end;gap:6px;height:80px;padding:8px 0;}
+        .chart-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
+        .chart-bar{width:100%;border-radius:4px 4px 0 0;transition:height .6s ease;min-height:2px;}
+        .chart-bar-label{font-size:9px;color:var(--muted);text-align:center;white-space:nowrap;}
+        .chart-bar-val{font-size:10px;font-weight:700;}
+
+        .report-btn{width:100%;padding:9px;border-radius:8px;border:1px solid var(--accent2);background:transparent;color:var(--accent2);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:6px;}
+        .report-btn:hover{background:rgba(0,196,212,.1);}
+
+        .patient-card{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;background:var(--card);border:1px solid var(--border);margin-bottom:5px;font-size:11px;animation:slideIn .3s ease;}
+        @keyframes slideIn{from{opacity:0;transform:translateX(-10px)}}
+        .patient-triage-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+
+        .sim-btn{padding:7px 14px;border-radius:7px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-weight:600;font-size:11px;cursor:pointer;font-family:inherit;transition:all .2s;}
+        .sim-btn:hover{background:rgba(0,229,160,.1);}
+        .sim-btn.active{background:var(--accent);color:var(--bg);}
+
+        #toast-container{position:fixed;top:16px;right:16px;z-index:9000;display:flex;flex-direction:column;gap:6px;}
+        .toast{padding:10px 16px;border-radius:9px;background:var(--card);border:1px solid var(--border);font-size:12px;display:flex;align-items:center;gap:7px;transform:translateX(120%);transition:transform .3s ease;box-shadow:0 8px 32px rgba(0,0,0,.4);max-width:350px;}
+        .toast.show{transform:translateX(0);}
+        .toast-success{border-color:rgba(0,229,160,.3);}
+        .toast-success i{color:var(--accent);}
+        .toast-error{border-color:rgba(255,51,85,.3);}
+        .toast-error i{color:var(--critical);}
+
+        .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:180px;color:var(--muted);text-align:center;}
+        .empty-state i{font-size:28px;margin-bottom:10px;opacity:.3;}
+
+        .modal-overlay{position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transition:all .3s;}
+        .modal-overlay.show{opacity:1;visibility:visible;}
+        .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;transform:scale(.95);transition:transform .3s;}
+        .modal-overlay.show .modal{transform:scale(1);}
+
+        ::-webkit-scrollbar{width:4px;}
+        ::-webkit-scrollbar-track{background:transparent;}
+        ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+        @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;}}
+    </style>
+</head>
+<body>
+    <div id="loader">
+        <div class="loader-pulse"></div>
+        <p style="margin-top:20px;font-family:'Syne',sans-serif;font-weight:700;font-size:18px;color:var(--accent);">MedPulse AI</p>
+        <p style="margin-top:6px;font-size:12px;color:var(--muted);">Initializing triage engine...</p>
+        <div class="loader-bar"><div class="loader-bar-fill"></div></div>
+    </div>
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+    <div id="toast-container"></div>
+
+    <div class="app-container">
+        <header class="app-header">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div class="logo-mark">M</div>
+                <div>
+                    <h1 style="font-size:15px;font-weight:800;letter-spacing:-.5px;">MedPulse AI</h1>
+                    <p style="font-size:9px;color:var(--muted);letter-spacing:1px;">INTELLIGENT EMERGENCY TRIAGE &middot; SUNHACKS 2K26</p>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div class="stat-pill"><i class="fas fa-users" style="color:var(--muted);font-size:10px;"></i> Triage Done <span class="val" id="stat-triaged">0</span></div>
+                <div class="stat-pill"><i class="fas fa-bullseye" style="color:var(--muted);font-size:10px;"></i> Accuracy <span class="val" id="stat-accuracy">96.8%</span></div>
+                <div class="stat-pill"><div class="status-dot"></div> Live</div>
+                <button class="sim-btn" id="sim-toggle"><i class="fas fa-play" style="margin-right:4px;font-size:9px;"></i> Simulation</button>
+            </div>
+        </header>
+
+        <div class="main-grid">
+            <!-- Left Panel -->
+            <div class="panel" id="left-panel">
+                <div class="panel-title"><i class="fas fa-crosshairs" style="margin-right:5px;"></i> Select Body Region</div>
+                <div id="region-buttons"></div>
+
+                <!-- Voice + Text Input -->
+                <div class="input-area">
+                    <div class="panel-title" style="margin-top:12px;"><i class="fas fa-microphone-lines" style="margin-right:5px;"></i> Quick Input</div>
+                    <button class="voice-btn" id="voice-btn"><i class="fas fa-microphone"></i> Voice — Describe Symptoms</button>
+                    <div class="text-input-wrap">
+                        <input type="text" class="text-input" id="text-input" placeholder="Or type: chest pain, breathing difficulty...">
+                        <button class="text-submit" id="text-submit"><i class="fas fa-arrow-right"></i></button>
+                    </div>
+                    <div class="input-status" id="input-status"></div>
+                </div>
+
+                <div id="symptom-section" style="display:none;margin-top:12px;">
+                    <div class="panel-title"><i class="fas fa-stethoscope" style="margin-right:5px;"></i> <span id="symptom-region-name"></span></div>
+                    <div id="symptom-list"></div>
+                    <div style="margin-top:10px;">
+                        <button class="analyze-btn" id="analyze-btn" disabled>
+                            <span class="shimmer"></span>
+                            <i class="fas fa-brain" style="margin-right:5px;"></i> Run AI Analysis
+                        </button>
+                    </div>
+                    <div style="margin-top:6px;text-align:center;">
+                        <button id="clear-btn" style="background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;font-family:inherit;">Clear Selection</button>
+                    </div>
+                </div>
+
+                <div style="margin-top:14px;">
+                    <div class="panel-title"><i class="fas fa-clock" style="margin-right:5px;"></i> Time Comparison</div>
+                    <div class="time-compare">
+                        <div class="time-box manual">
+                            <div class="t-label">Manual Triage</div>
+                            <div class="t-val">45 <span class="t-unit">min</span></div>
+                        </div>
+                        <div class="time-box ai">
+                            <div class="t-label">MedPulse AI</div>
+                            <div class="t-val" id="ai-time">12 <span class="t-unit">sec</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="queue-section" style="display:none;margin-top:14px;">
+                    <div class="panel-title"><i class="fas fa-list-check" style="margin-right:5px;"></i> Patient Queue</div>
+                    <div id="patient-queue"></div>
+                </div>
+            </div>
+
+            <!-- Center: 3D Canvas -->
+            <div class="canvas-container" id="canvas-container">
+                <canvas id="three-canvas"></canvas>
+                <div class="canvas-overlay">
+                    <span class="canvas-hint"><i class="fas fa-hand-pointer" style="margin-right:3px;"></i> Click glowing points to select</span>
+                    <span class="canvas-hint"><i class="fas fa-arrows-rotate" style="margin-right:3px;"></i> Drag to rotate</span>
+                </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="panel" id="right-panel">
+                <div class="panel-title"><i class="fas fa-microchip" style="margin-right:5px;"></i> AI Analysis Results</div>
+                <div id="results-container">
+                    <div class="empty-state">
+                        <i class="fas fa-heart-pulse"></i>
+                        <p style="font-size:12px;font-weight:500;">Awaiting Input</p>
+                        <p style="font-size:10px;margin-top:4px;">Select a body region, type symptoms, or use voice input</p>
+                    </div>
+                </div>
+
+                <div style="margin-top:12px;">
+                    <div class="panel-title"><i class="fas fa-chart-bar" style="margin-right:5px;"></i> Triage Distribution</div>
+                    <div class="chart-bar-container" id="chart-container">
+                        <div class="chart-bar-wrap">
+                            <div class="chart-bar-val" style="color:var(--critical);" id="cv-crit">0</div>
+                            <div class="chart-bar" id="cb-crit" style="background:var(--critical);height:2px;"></div>
+                            <div class="chart-bar-label">Critical</div>
+                        </div>
+                        <div class="chart-bar-wrap">
+                            <div class="chart-bar-val" style="color:var(--urgent);" id="cv-urg">0</div>
+                            <div class="chart-bar" id="cb-urg" style="background:var(--urgent);height:2px;"></div>
+                            <div class="chart-bar-label">Urgent</div>
+                        </div>
+                        <div class="chart-bar-wrap">
+                            <div class="chart-bar-val" style="color:var(--semi);" id="cv-semi">0</div>
+                            <div class="chart-bar" id="cb-semi" style="background:var(--semi);height:2px;"></div>
+                            <div class="chart-bar-label">Semi</div>
+                        </div>
+                        <div class="chart-bar-wrap">
+                            <div class="chart-bar-val" style="color:var(--non);" id="cv-non">0</div>
+                            <div class="chart-bar" id="cb-non" style="background:var(--non);height:2px;"></div>
+                            <div class="chart-bar-label">Non-Urgent</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="report-btn" id="report-btn" style="display:none;">
+                    <i class="fas fa-file-medical"></i> Generate Medical Report
+                </button>
+            </div>
+        </div>
+
+        <div class="bottom-bar">
+            <div class="metric-cell"><div class="metric-label">Critical</div><div class="metric-value" style="color:var(--critical);" id="m-critical">0</div></div>
+            <div class="metric-cell"><div class="metric-label">Urgent</div><div class="metric-value" style="color:var(--urgent);" id="m-urgent">0</div></div>
+            <div class="metric-cell"><div class="metric-label">Semi-Urgent</div><div class="metric-value" style="color:var(--semi);" id="m-semi">0</div></div>
+            <div class="metric-cell"><div class="metric-label">Non-Urgent</div><div class="metric-value" style="color:var(--non);" id="m-non">0</div></div>
+        </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div class="modal-overlay" id="report-modal">
+        <div class="modal">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                <h3 style="font-size:16px;font-weight:800;">Medical Triage Report</h3>
+                <button id="close-modal" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div id="report-content" style="font-size:12px;line-height:1.7;"></div>
+            <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:10px;color:var(--muted);">Generated by MedPulse AI &middot; SUNHACKS 2K26</span>
+                <button id="print-report" class="report-btn" style="width:auto;margin:0;padding:7px 16px;"><i class="fas fa-print"></i> Print</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ============================================================
+        // MEDICAL DATABASE
+        // ============================================================
+        const REGIONS = {
+            head:{name:'Head & Brain',icon:'fa-brain',color:'#a78bfa',symptoms:[
+                {id:'severe_headache',name:'Severe Headache',severity:6},
+                {id:'vision_loss',name:'Sudden Vision Loss',severity:9},
+                {id:'dizziness',name:'Dizziness / Vertigo',severity:4},
+                {id:'confusion',name:'Confusion / Disorientation',severity:7},
+                {id:'fainting',name:'Fainting / Unconsciousness',severity:8},
+                {id:'numbness_face',name:'Facial Numbness / Drooping',severity:9},
+                {id:'slurred_speech',name:'Slurred Speech',severity:8},
+            ]},
+            chest:{name:'Chest & Heart',icon:'fa-heart-pulse',color:'#f472b6',symptoms:[
+                {id:'chest_pain',name:'Crushing Chest Pain',severity:10},
+                {id:'breathing_diff',name:'Difficulty Breathing',severity:8},
+                {id:'palpitations',name:'Rapid Heart Palpitations',severity:6},
+                {id:'cough_blood',name:'Coughing Up Blood',severity:9},
+                {id:'chest_tightness',name:'Chest Tightness',severity:8},
+                {id:'irregular_pulse',name:'Irregular Pulse',severity:5},
+            ]},
+            abdomen:{name:'Abdomen',icon:'fa-stomach',color:'#fbbf24',symptoms:[
+                {id:'severe_abd_pain',name:'Severe Abdominal Pain',severity:8},
+                {id:'nausea_vomiting',name:'Persistent Nausea / Vomiting',severity:4},
+                {id:'blood_stool',name:'Blood in Stool',severity:8},
+                {id:'jaundice',name:'Yellowing Skin / Eyes',severity:7},
+                {id:'urinary_retention',name:'Unable to Urinate',severity:7},
+                {id:'abd_swelling',name:'Abdominal Swelling',severity:5},
+            ]},
+            limbs:{name:'Arms & Legs',icon:'fa-bone',color:'#34d399',symptoms:[
+                {id:'limb_pain',name:'Severe Limb Pain',severity:6},
+                {id:'swelling',name:'Joint / Limb Swelling',severity:5},
+                {id:'numbness_tingling',name:'Numbness / Tingling',severity:6},
+                {id:'weakness',name:'Sudden Weakness',severity:7},
+                {id:'joint_deformity',name:'Visible Joint Deformity',severity:7},
+                {id:'cold_limb',name:'Cold / Pale Limb',severity:8},
+            ]},
+            skin:{name:'Skin & General',icon:'fa-hand-dots',color:'#fb923c',symptoms:[
+                {id:'severe_burn',name:'Severe Burn Injury',severity:8},
+                {id:'allergic_reaction',name:'Severe Allergic Reaction',severity:9},
+                {id:'rash_spreading',name:'Rapidly Spreading Rash',severity:5},
+                {id:'uncontrolled_bleed',name:'Uncontrolled Bleeding',severity:9},
+                {id:'fever_high',name:'High Fever (>103F)',severity:6},
+                {id:'seizure',name:'Seizure / Convulsion',severity:9},
+            ]}
+        };
+
+        const CONDITIONS = [
+            {name:'Acute Myocardial Infarction (Heart Attack)',triage:'CRITICAL',required:['chest_pain'],minReq:1,indicators:['breathing_diff','chest_tightness','weakness','palpitations','irregular_pulse'],desc:'Heart muscle damage due to blocked coronary artery. Requires immediate cardiac intervention.',actions:['Activate cardiac catheterization lab','Administer aspirin 325mg chewable','12-lead ECG within 10 minutes','Continuous cardiac monitoring','Prepare for PCI or thrombolysis','IV access with normal saline']},
+            {name:'Ischemic Stroke (CVA)',triage:'CRITICAL',required:['numbness_face','slurred_speech','fainting'],minReq:1,indicators:['severe_headache','vision_loss','weakness','confusion','dizziness'],desc:'Brain tissue ischemia due to vascular occlusion. Time-critical — every minute matters.',actions:['Activate stroke code immediately','CT head without contrast (< 25 min)','NIH Stroke Scale assessment','Check tPA eligibility (4.5hr window)','Blood glucose level','Neurology consult STAT']},
+            {name:'Pulmonary Embolism',triage:'CRITICAL',required:['breathing_diff','chest_pain'],minReq:1,indicators:['cough_blood','dizziness','fainting','irregular_pulse'],desc:'Blood clot in pulmonary arteries causing respiratory and hemodynamic compromise.',actions:['Supplemental oxygen SpO2 > 94%','CT pulmonary angiography','D-dimer blood test','Anticoagulation if confirmed','Hemodynamic monitoring','ICU admission if unstable']},
+            {name:'Severe Anaphylaxis',triage:'CRITICAL',required:['allergic_reaction'],minReq:1,indicators:['breathing_diff','swelling','dizziness','fainting','rash_spreading'],desc:'Life-threatening systemic allergic reaction with airway compromise risk.',actions:['IM epinephrine 0.3-0.5mg immediately','Secure airway — prepare intubation','IV fluid bolus NS 1-2L','Diphenhydramine IV','Methylprednisolone IV','Monitor 6-12 hours']},
+            {name:'Acute Abdominal Emergency',triage:'URGENT',required:['severe_abd_pain'],minReq:1,indicators:['nausea_vomiting','abd_swelling','fever_high','blood_stool'],desc:'Possible bowel perforation or obstruction requiring urgent surgical assessment.',actions:['NPO — nothing by mouth','Nasogastric tube','IV fluids + electrolytes','Urgent surgical consult','Abdominal CT with contrast','CBC, lactate, lipase']},
+            {name:'Seizure Disorder (Active)',triage:'URGENT',required:['seizure'],minReq:1,indicators:['confusion','fainting','dizziness','severe_headache'],desc:'Active seizure requiring immediate management and cause identification.',actions:['Protect from injury — clear area','Recovery position — lateral','Do NOT insert anything in mouth','IV lorazepam if > 5 min','Blood glucose check','EEG and neurology referral']},
+            {name:'Severe Fracture / Trauma',triage:'URGENT',required:['joint_deformity','severe_burn'],minReq:1,indicators:['limb_pain','swelling','uncontrolled_bleed','weakness','cold_limb'],desc:'Significant musculoskeletal injury requiring orthopedic assessment.',actions:['Immobilize affected limb','C-spine precautions if trauma','IV analgesia','X-ray affected area','Check distal pulses','Orthopedic surgery consult']},
+            {name:'GI Hemorrhage',triage:'URGENT',required:['blood_stool'],minReq:1,indicators:['nausea_vomiting','severe_abd_pain','dizziness','weakness','abd_swelling'],desc:'Significant GI bleeding requiring volume resuscitation.',actions:['Two large-bore IV access','Type and crossmatch blood','IV PPI (pantoprazole)','CBC, coagulation profile','Urgent upper endoscopy','Crystalloid resuscitation']},
+            {name:'Migraine / Tension Headache',triage:'SEMI-URGENT',required:['severe_headache'],minReq:1,indicators:['dizziness','nausea_vomiting','vision_loss','numbness_tingling'],desc:'Severe primary headache. Rule out secondary causes before diagnosis.',actions:['Pain scale assessment','NSAIDs or triptans','Dark quiet room','Hydration','Neurological exam','CT if atypical features']},
+            {name:'Minor Injury / Soft Tissue',triage:'NON-URGENT',required:['limb_pain','swelling','rash_spreading'],minReq:1,indicators:['numbness_tingling'],desc:'Minor musculoskeletal or dermatological complaint.',actions:['RICE protocol','OTC analgesia','Wound care if needed','Primary care follow-up','Tetanus status check','Patient education']},
+        ];
+
+        const SIM_PATIENTS = [
+            {name:'Rajesh K.',age:58,gender:'M',symptoms:['chest_pain','breathing_diff','chest_tightness']},
+            {name:'Priya S.',age:32,gender:'F',symptoms:['severe_headache','vision_loss','numbness_face']},
+            {name:'Amit M.',age:45,gender:'M',symptoms:['severe_abd_pain','nausea_vomiting','fever_high']},
+            {name:'Sunita D.',age:68,gender:'F',symptoms:['breathing_diff','cough_blood','fainting']},
+            {name:'Vikram R.',age:28,gender:'M',symptoms:['limb_pain','joint_deformity','swelling']},
+            {name:'Meera J.',age:22,gender:'F',symptoms:['rash_spreading','allergic_reaction','breathing_diff']},
+            {name:'Suresh P.',age:72,gender:'M',symptoms:['fainting','confusion','slurred_speech']},
+            {name:'Anita G.',age:40,gender:'F',symptoms:['severe_burn','swelling','limb_pain']},
+            {name:'Ravi T.',age:55,gender:'M',symptoms:['blood_stool','severe_abd_pain','dizziness']},
+            {name:'Kavita N.',age:35,gender:'F',symptoms:['seizure','confusion','fever_high']},
+        ];
+
+        // Voice keyword mapping — case insensitive
+        const VOICE_KEYWORDS = {
+            'chest pain':'chest_pain','crushing chest':'chest_pain',
+            'breathing':'breathing_diff','breath':'breathing_diff','shortness of breath':'breathing_diff','difficulty breathing':'breathing_diff','can\'t breathe':'breathing_diff',
+            'headache':'severe_headache','head pain':'severe_headache','severe headache':'severe_headache',
+            'vision':'vision_loss','blind':'vision_loss','cannot see':'vision_loss','lost vision':'vision_loss','blurry vision':'vision_loss',
+            'dizzy':'dizziness','vertigo':'dizziness','spinning':'dizziness',
+            'confused':'confusion','confusion':'confusion','disoriented':'confusion',
+            'faint':'fainting','fainted':'fainting','unconscious':'fainting','collapsed':'fainting','blackout':'fainting','passed out':'fainting',
+            'face numb':'numbness_face','face droop':'numbness_face','facial numb':'numbness_face','drooping face':'numbness_face',
+            'slurred':'slurred_speech','slur':'slurred_speech','slurred speech':'slurred_speech',
+            'palpitation':'palpitations','heart racing':'palpitations','fast heartbeat':'palpitations','racing heart':'palpitations',
+            'cough blood':'cough_blood','coughing blood':'cough_blood','blood in cough':'cough_blood',
+            'chest tight':'chest_tightness','chest pressure':'chest_tightness','chest heavy':'chest_tightness',
+            'irregular pulse':'irregular_pulse','irregular heartbeat':'irregular_pulse',
+            'stomach pain':'severe_abd_pain','abdominal pain':'severe_abd_pain','belly pain':'severe_abd_pain','stomach ache':'severe_abd_pain',
+            'nausea':'nausea_vomiting','vomiting':'nausea_vomiting','vomit':'nausea_vomiting','throwing up':'nausea_vomiting',
+            'blood stool':'blood_stool','blood in stool':'blood_stool','bloody stool':'blood_stool',
+            'yellow':'jaundice','jaundice':'jaundice','yellow skin':'jaundice','yellow eyes':'jaundice',
+            'urine':'urinary_retention','cannot urinate':'urinary_retention','can\'t pee':'urinary_retention',
+            'swelling':'swelling','swollen':'swelling','inflammation':'swelling',
+            'limb pain':'limb_pain','arm pain':'limb_pain','leg pain':'limb_pain','pain in arm':'limb_pain','pain in leg':'limb_pain',
+            'numb':'numbness_tingling','tingling':'numbness_tingling','pins and needles':'numbness_tingling',
+            'weak':'weakness','weakness':'weakness','sudden weakness':'weakness','feels weak':'weakness',
+            'deformity':'joint_deformity','deformed':'joint_deformity','broken bone':'joint_deformity','fracture':'joint_deformity',
+            'cold limb':'cold_limb','pale limb':'cold_limb','cold arm':'cold_limb','cold leg':'cold_limb',
+            'burn':'severe_burn','burns':'severe_burn','burn injury':'severe_burn',
+            'allergic':'allergic_reaction','allergy':'allergic_reaction','anaphylaxis':'allergic_reaction','allergic reaction':'allergic_reaction',
+            'rash':'rash_spreading','skin rash':'rash_spreading',
+            'bleeding':'uncontrolled_bleed','bleed':'uncontrolled_bleed','blood loss':'uncontrolled_bleed',
+            'fever':'fever_high','high fever':'fever_high','temperature':'fever_high',
+            'seizure':'seizure','convulsion':'seizure','fit':'seizure','epilepsy':'seizure','shaking':'seizure',
+        };
+
+        // ============================================================
+        // STATE
+        // ============================================================
+        let selectedRegion = null;
+        let selectedSymptoms = [];
+        let simulationActive = false;
+        let simInterval = null;
+        let simIndex = 0;
+        let stats = {critical:0,urgent:0,semi:0,non:0,total:0};
+        let lastResult = null;
+        let isListening = false;
+        let voiceSupported = false;
+        let recognition = null;
+
+        // ============================================================
+        // CHECK VOICE SUPPORT ON LOAD
+        // ============================================================
+        try {
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SR) {
+                voiceSupported = true;
+                recognition = new SR();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+
+                recognition.onresult = (e) => {
+                    const transcript = e.results[0][0].transcript.toLowerCase();
+                    document.getElementById('input-status').textContent = `"${transcript}"`;
+                    document.getElementById('input-status').style.color = 'var(--accent)';
+                    processTextInput(transcript);
+                    stopListening();
+                };
+                recognition.onend = () => stopListening();
+                recognition.onerror = (e) => {
+                    stopListening();
+                    if (e.error === 'not-allowed') {
+                        document.getElementById('input-status').textContent = 'Mic permission denied. Use text input below.';
+                        document.getElementById('input-status').style.color = 'var(--critical)';
+                    } else if (e.error === 'no-speech') {
+                        document.getElementById('input-status').textContent = 'No speech detected. Try again or type below.';
+                        document.getElementById('input-status').style.color = 'var(--urgent)';
+                    } else if (e.error === 'network') {
+                        document.getElementById('input-status').textContent = 'Network error. Use text input below.';
+                        document.getElementById('input-status').style.color = 'var(--urgent)';
+                    } else {
+                        document.getElementById('input-status').textContent = `Voice error: ${e.error}. Use text input.`;
+                        document.getElementById('input-status').style.color = 'var(--urgent)';
+                    }
+                };
+            }
+        } catch(err) {
+            voiceSupported = false;
+        }
+
+        // ============================================================
+        // UI — Region Buttons
+        // ============================================================
+        const regionBtnsContainer = document.getElementById('region-buttons');
+        Object.entries(REGIONS).forEach(([key, region]) => {
+            const btn = document.createElement('button');
+            btn.className = 'region-btn';
+            btn.dataset.region = key;
+            btn.innerHTML = `<div class="region-icon" style="background:${region.color}22;color:${region.color};"><i class="fas ${region.icon}"></i></div><div><div style="font-weight:600;">${region.name}</div><div style="font-size:9px;color:var(--muted);">${region.symptoms.length} symptoms</div></div>`;
+            btn.addEventListener('click', () => selectRegion(key));
+            regionBtnsContainer.appendChild(btn);
+        });
+
+        // ============================================================
+        // REGION & SYMPTOM SELECTION
+        // ============================================================
+        function selectRegion(regionKey) {
+            selectedRegion = regionKey;
+            selectedSymptoms = [];
+            const region = REGIONS[regionKey];
+            document.querySelectorAll('.region-btn').forEach(b => b.classList.toggle('active', b.dataset.region === regionKey));
+            document.getElementById('symptom-section').style.display = 'block';
+            document.getElementById('symptom-region-name').textContent = region.name;
+            const list = document.getElementById('symptom-list');
+            list.innerHTML = '';
+            region.symptoms.forEach(sym => {
+                const item = document.createElement('div');
+                item.className = 'symptom-item';
+                item.dataset.id = sym.id;
+                const sevColor = sym.severity>=8?'var(--critical)':sym.severity>=6?'var(--urgent)':'var(--semi)';
+                item.innerHTML = `<div class="symptom-check"><i class="fas fa-check"></i></div><span>${sym.name}</span><span class="severity-badge" style="background:${sevColor}22;color:${sevColor};">S${sym.severity}</span>`;
+                item.addEventListener('click', () => toggleSymptom(sym, item));
+                list.appendChild(item);
+            });
+            document.getElementById('analyze-btn').disabled = true;
+            highlightHotspot(regionKey);
+        }
+
+        function toggleSymptom(sym, el) {
+            const idx = selectedSymptoms.findIndex(s => s.id === sym.id);
+            if (idx > -1) { selectedSymptoms.splice(idx,1); el.classList.remove('checked'); }
+            else { selectedSymptoms.push(sym); el.classList.add('checked'); }
+            document.getElementById('analyze-btn').disabled = selectedSymptoms.length === 0;
+        }
+
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            selectedSymptoms = []; selectedRegion = null; lastResult = null;
+            document.querySelectorAll('.symptom-item').forEach(i => i.classList.remove('checked'));
+            document.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('symptom-section').style.display = 'none';
+            document.getElementById('analyze-btn').disabled = true;
+            document.getElementById('report-btn').style.display = 'none';
+            clearHotspotHighlight();
+            document.getElementById('results-container').innerHTML = '<div class="empty-state"><i class="fas fa-heart-pulse"></i><p style="font-size:12px;font-weight:500;">Awaiting Input</p><p style="font-size:10px;margin-top:4px;">Select a body region, type symptoms, or use voice input</p></div>';
+        });
+
+        // ============================================================
+        // VOICE INPUT (Fixed — no crash)
+        // ============================================================
+        const voiceBtn = document.getElementById('voice-btn');
+
+        if (!voiceSupported) {
+            voiceBtn.innerHTML = '<i class="fas fa-microphone-slash" style="color:var(--muted);"></i> Voice unavailable — use text below';
+            voiceBtn.style.opacity = '0.5';
+            voiceBtn.style.cursor = 'not-allowed';
+            voiceBtn.disabled = true;
+        }
+
+        voiceBtn.addEventListener('click', () => {
+            if (!voiceSupported || !recognition) {
+                showToast('Voice not supported. Please use the text input below.', 'error');
+                return;
+            }
+            if (isListening) { stopListening(); return; }
+            startListening();
+        });
+
+        function startListening() {
+            try {
+                isListening = true;
+                voiceBtn.classList.add('listening');
+                voiceBtn.innerHTML = '<i class="fas fa-microphone" style="color:var(--critical);"></i> Listening...';
+                document.getElementById('input-status').textContent = 'Speak your symptoms now...';
+                document.getElementById('input-status').style.color = 'var(--accent2)';
+                recognition.start();
+            } catch(err) {
+                stopListening();
+                document.getElementById('input-status').textContent = 'Failed to start mic. Use text input.';
+                document.getElementById('input-status').style.color = 'var(--critical)';
+            }
+        }
+
+        function stopListening() {
+            isListening = false;
+            voiceBtn.classList.remove('listening');
+            if (voiceSupported) {
+                voiceBtn.innerHTML = '<i class="fas fa-microphone"></i> Voice — Describe Symptoms';
+            }
+            try { recognition.stop(); } catch(e) {}
+        }
+
+        // ============================================================
+        // TEXT INPUT (Fallback + Primary)
+        // ============================================================
+        const textInput = document.getElementById('text-input');
+        const textSubmit = document.getElementById('text-submit');
+
+        textSubmit.addEventListener('click', () => {
+            const text = textInput.value.trim();
+            if (!text) { showToast('Type your symptoms first', 'error'); return; }
+            document.getElementById('input-status').textContent = `"${text}"`;
+            document.getElementById('input-status').style.color = 'var(--accent)';
+            processTextInput(text);
+            textInput.value = '';
+        });
+
+        textInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') textSubmit.click();
+        });
+
+        // Common text input examples shown as placeholder hints
+        const inputHints = [
+            'chest pain, breathing difficulty',
+            'severe headache, vision loss',
+            'stomach pain, vomiting, fever',
+            'allergic reaction, swelling',
+            'seizure, confusion, high fever',
+        ];
+        let hintIdx = 0;
+        setInterval(() => {
+            if (document.activeElement === textInput) return;
+            textInput.placeholder = `Try: ${inputHints[hintIdx]}`;
+            hintIdx = (hintIdx + 1) % inputHints.length;
+        }, 3000);
+
+        // ============================================================
+        // PROCESS TEXT/VOICE INPUT → MATCH SYMPTOMS
+        // ============================================================
+        function processTextInput(text) {
+            const lowerText = text.toLowerCase().replace(/[^\w\s']/g, ' ');
+            const allSymptoms = Object.values(REGIONS).flatMap(r => r.symptoms);
+            let matchedIds = new Set();
+
+            // Sort keywords by length (longer first for better matching)
+            const sortedKeywords = Object.entries(VOICE_KEYWORDS).sort((a, b) => b[0].length - a[0].length);
+
+            sortedKeywords.forEach(([keyword, id]) => {
+                if (lowerText.includes(keyword)) matchedIds.add(id);
+            });
+
+            if (matchedIds.size === 0) {
+                showToast('No symptoms recognized. Try: "chest pain, breathing difficulty"', 'error');
+                document.getElementById('input-status').textContent = 'No match found. Try different words.';
+                document.getElementById('input-status').style.color = 'var(--urgent)';
+                return;
+            }
+
+            const matchedSymptoms = [...matchedIds].map(id => allSymptoms.find(s => s.id === id)).filter(Boolean);
+
+            // Find best region (the one with most matched symptoms)
+            let bestRegion = null;
+            let bestCount = 0;
+            Object.entries(REGIONS).forEach(([key, region]) => {
+                const count = region.symptoms.filter(s => matchedIds.has(s.id)).length;
+                if (count > bestCount) { bestCount = count; bestRegion = key; }
+            });
+
+            if (bestRegion) selectRegion(bestRegion);
+
+            // Small delay so region UI renders first
+            setTimeout(() => {
+                matchedSymptoms.forEach(sym => {
+                    const el = document.querySelector(`.symptom-item[data-id="${sym.id}"]`);
+                    if (el && !el.classList.contains('checked')) {
+                        toggleSymptom(sym, el);
+                    }
+                });
+                document.getElementById('input-status').textContent = `${matchedSymptoms.length} symptoms matched`;
+                document.getElementById('input-status').style.color = 'var(--accent)';
+                showToast(`${matchedSymptoms.length} symptoms detected: ${matchedSymptoms.map(s=>s.name.split(' ')[0]).join(', ')}`, 'success');
+            }, 250);
+        }
+
+        // ============================================================
+        // AI TRIAGE ENGINE
+        // ============================================================
+        function analyzeSymptoms(symptoms) {
+            if (!symptoms.length) return null;
+            const ids = symptoms.map(s => s.id);
+            let totalSev = symptoms.reduce((a, s) => a + s.severity, 0);
+            let matches = CONDITIONS.map(c => {
+                let reqMet = c.required.filter(r => ids.includes(r)).length;
+                let indMet = c.indicators.filter(i => ids.includes(i)).length;
+                let score = reqMet * 30 + indMet * 15;
+                score *= reqMet < c.minReq ? 0.25 : 1;
+                let maxScore = c.required.length * 30 + c.indicators.length * 15;
+                let confidence = Math.min(97, Math.max(12, Math.round((score / Math.max(1, maxScore)) * 100)));
+                return {...c, score, confidence, reqMet, indMet};
+            });
+            matches.sort((a, b) => b.score - a.score);
+            let best = matches[0];
+            let triageLevel;
+            if (best.score >= 30 && best.confidence >= 35) triageLevel = best.triage;
+            else if (totalSev >= 20) triageLevel = 'URGENT';
+            else if (totalSev >= 10) triageLevel = 'SEMI-URGENT';
+            else triageLevel = 'NON-URGENT';
+            return { triageLevel, topMatch: best, alternatives: matches.slice(1,3).filter(m => m.score > 10), totalSeverity: totalSev, symptomCount: symptoms.length };
+        }
+
+        // ============================================================
+        // ANALYZE
+        // ============================================================
+        document.getElementById('analyze-btn').addEventListener('click', () => {
+            if (!selectedSymptoms.length) return;
+            runAnalysis(selectedSymptoms);
+        });
+
+        function runAnalysis(symptoms) {
+            const container = document.getElementById('results-container');
+            container.innerHTML = '<div class="scan-line"></div>';
+            container.style.position = 'relative';
+            const startTime = Date.now();
+            setTimeout(() => {
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                const result = analyzeSymptoms(symptoms);
+                if (!result) return;
+                result.timeElapsed = elapsed;
+                result.symptomsList = symptoms.map(s => s.name);
+                lastResult = result;
+                displayResults(result);
+                updateStats(result.triageLevel);
+                updateChart();
+                document.getElementById('ai-time').innerHTML = `${elapsed} <span class="t-unit">sec</span>`;
+                document.getElementById('report-btn').style.display = 'flex';
+            }, 1200);
+        }
+
+        function displayResults(result) {
+            const container = document.getElementById('results-container');
+            const tc = result.triageLevel==='CRITICAL'?'critical':result.triageLevel==='URGENT'?'urgent':result.triageLevel==='SEMI-URGENT'?'semi':'non';
+            const triColor = result.triageLevel==='CRITICAL'?'var(--critical)':result.triageLevel==='URGENT'?'var(--urgent)':result.triageLevel==='SEMI-URGENT'?'var(--semi)':'var(--non)';
+            const conf = result.topMatch.confidence;
+            const circ = 2 * Math.PI * 22;
+            const off = circ - (conf/100)*circ;
+
+            container.innerHTML = `
+                <div class="result-card" id="rc1">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                        <div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;">Triage Classification</div>
+                        <div class="triage-badge triage-${tc}" style="margin-top:5px;"><i class="fas fa-${result.triageLevel==='CRITICAL'?'circle-exclamation':result.triageLevel==='URGENT'?'triangle-exclamation':'info-circle'}"></i>${result.triageLevel}</div></div>
+                        <div class="confidence-ring"><svg width="50" height="50" viewBox="0 0 50 50"><circle cx="25" cy="25" r="22" fill="none" stroke="var(--border)" stroke-width="3.5"/><circle cx="25" cy="25" r="22" fill="none" stroke="${triColor}" stroke-width="3.5" stroke-dasharray="${circ}" stroke-dashoffset="${off}" stroke-linecap="round" style="transition:stroke-dashoffset 1s ease;"/></svg><div class="confidence-val" style="color:${triColor};font-size:12px;">${conf}%</div></div>
+                    </div>
+                    <div style="font-size:10px;color:var(--muted);">Confidence &middot; ${result.symptomCount} symptoms &middot; ${result.timeElapsed}s</div>
+                </div>
+                <div class="result-card" id="rc2">
+                    <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:5px;">Primary Assessment</div>
+                    <div style="font-size:13px;font-weight:700;font-family:'Syne',sans-serif;color:${triColor};line-height:1.3;">${result.topMatch.name}</div>
+                    <p style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5;">${result.topMatch.desc}</p>
+                    <div style="display:flex;gap:10px;margin-top:8px;font-size:9px;color:var(--muted);">Severity <span style="color:${triColor};font-weight:700;">${result.totalSeverity}/60</span> &middot; Indicators <span style="color:var(--accent);font-weight:700;">${result.topMatch.indMet}/${result.topMatch.indicators.length}</span></div>
+                </div>
+                <div class="result-card" id="rc3">
+                    <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px;"><i class="fas fa-list-check" style="margin-right:4px;"></i>Recommended Actions</div>
+                    ${result.topMatch.actions.map((a,i)=>`<div class="action-item"><div class="action-num">${i+1}</div><span>${a}</span></div>`).join('')}
+                </div>
+                ${result.alternatives.length>0?`<div class="result-card" id="rc4"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px;">Differential Diagnoses</div>${result.alternatives.map(a=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(26,45,74,.4);font-size:11px;"><span style="color:var(--muted);">${a.name.split('(')[0].trim()}</span><span style="font-weight:600;color:var(--accent);font-size:10px;">${a.confidence}%</span></div>`).join('')}</div>`:''}`;
+            ['rc1','rc2','rc3','rc4'].forEach((id,i)=>{const el=document.getElementById(id);if(el)setTimeout(()=>el.classList.add('visible'),150*(i+1));});
+            triggerBodyGlow(result.triageLevel);
+        }
+
+        function updateStats(tl) {
+            if(tl==='CRITICAL')stats.critical++;else if(tl==='URGENT')stats.urgent++;else if(tl==='SEMI-URGENT')stats.semi++;else stats.non++;
+            stats.total++;
+            document.getElementById('m-critical').textContent=stats.critical;
+            document.getElementById('m-urgent').textContent=stats.urgent;
+            document.getElementById('m-semi').textContent=stats.semi;
+            document.getElementById('m-non').textContent=stats.non;
+            document.getElementById('stat-triaged').textContent=stats.total;
+        }
+
+        function updateChart() {
+            const mx = Math.max(1, stats.critical, stats.urgent, stats.semi, stats.non);
+            document.getElementById('cb-crit').style.height = (stats.critical/mx*65+2)+'px';
+            document.getElementById('cb-urg').style.height = (stats.urgent/mx*65+2)+'px';
+            document.getElementById('cb-semi').style.height = (stats.semi/mx*65+2)+'px';
+            document.getElementById('cb-non').style.height = (stats.non/mx*65+2)+'px';
+            document.getElementById('cv-crit').textContent=stats.critical;
+            document.getElementById('cv-urg').textContent=stats.urgent;
+            document.getElementById('cv-semi').textContent=stats.semi;
+            document.getElementById('cv-non').textContent=stats.non;
+        }
+
+        // ============================================================
+        // REPORT
+        // ============================================================
+        document.getElementById('report-btn').addEventListener('click', () => {
+            if (!lastResult) return;
+            const r = lastResult;
+            const now = new Date();
+            document.getElementById('report-content').innerHTML = `
+                <div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px;background:var(--card);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <span style="font-weight:700;font-size:14px;font-family:'Syne',sans-serif;color:var(--accent);">MedPulse AI — Triage Report</span>
+                        <span style="font-size:10px;color:var(--muted);">${now.toLocaleDateString()} ${now.toLocaleTimeString()}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">
+                        <div><span style="color:var(--muted);">Triage Level:</span> <strong style="color:${r.triageLevel==='CRITICAL'?'var(--critical)':r.triageLevel==='URGENT'?'var(--urgent)':'var(--semi)'};">${r.triageLevel}</strong></div>
+                        <div><span style="color:var(--muted);">Confidence:</span> <strong style="color:var(--accent);">${r.topMatch.confidence}%</strong></div>
+                        <div><span style="color:var(--muted);">Analysis Time:</span> <strong>${r.timeElapsed}s</strong></div>
+                        <div><span style="color:var(--muted);">Symptoms:</span> <strong>${r.symptomCount}</strong></div>
+                    </div>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <div style="font-weight:600;font-size:12px;margin-bottom:4px;">Identified Condition</div>
+                    <div style="color:var(--accent);font-weight:600;">${r.topMatch.name}</div>
+                    <p style="color:var(--muted);font-size:11px;margin-top:3px;">${r.topMatch.desc}</p>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <div style="font-weight:600;font-size:12px;margin-bottom:4px;">Reported Symptoms</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;">${r.symptomsList.map(s=>`<span style="padding:2px 8px;border-radius:4px;background:var(--card);border:1px solid var(--border);font-size:10px;">${s}</span>`).join('')}</div>
+                </div>
+                <div>
+                    <div style="font-weight:600;font-size:12px;margin-bottom:4px;">Recommended Clinical Actions</div>
+                    ${r.topMatch.actions.map((a,i)=>`<div style="display:flex;gap:6px;padding:3px 0;font-size:11px;"><span style="color:var(--accent);font-weight:600;min-width:16px;">${i+1}.</span>${a}</div>`).join('')}
+                </div>
+                <div style="margin-top:12px;padding:8px;border-radius:6px;background:rgba(255,51,85,.08);border:1px solid rgba(255,51,85,.2);font-size:10px;color:var(--critical);">
+                    <i class="fas fa-triangle-exclamation" style="margin-right:4px;"></i>
+                    DISCLAIMER: AI-assisted triage tool. Final medical decisions must be made by a licensed physician.
+                </div>`;
+            document.getElementById('report-modal').classList.add('show');
+        });
+
+        document.getElementById('close-modal').addEventListener('click', () => document.getElementById('report-modal').classList.remove('show'));
+        document.getElementById('report-modal').addEventListener('click', (e) => { if(e.target===e.currentTarget) e.currentTarget.classList.remove('show'); });
+        document.getElementById('print-report').addEventListener('click', () => {
+            const c=document.getElementById('report-content');
+            const w=window.open('','','width=600,height=800');
+            w.document.write(`<html><head><title>MedPulse Report</title><style>body{font-family:'Segoe UI',sans-serif;padding:24px;color:#222;line-height:1.6;}strong{color:#006644;}</style></head><body>${c.innerHTML}</body></html>`);
+            w.document.close(); w.print();
+        });
+
+        // ============================================================
+        // SIMULATION
+        // ============================================================
+        const simToggle = document.getElementById('sim-toggle');
+        simToggle.addEventListener('click', () => {
+            simulationActive = !simulationActive;
+            simToggle.classList.toggle('active', simulationActive);
+            simToggle.innerHTML = simulationActive?'<i class="fas fa-stop" style="margin-right:4px;font-size:9px;"></i> Stop':'<i class="fas fa-play" style="margin-right:4px;font-size:9px;"></i> Simulation';
+            document.getElementById('queue-section').style.display = simulationActive?'block':'none';
+            if (simulationActive) {
+                simIndex=0; document.getElementById('patient-queue').innerHTML='';
+                showToast('Autonomous simulation started', 'success');
+                simInterval = setInterval(simulateNextPatient, 3000);
+            } else { clearInterval(simInterval); showToast('Simulation stopped', 'error'); }
+        });
+
+        function simulateNextPatient() {
+            if (simIndex >= SIM_PATIENTS.length) { simIndex=0; document.getElementById('patient-queue').innerHTML=''; }
+            const p = SIM_PATIENTS[simIndex];
+            const allSym = Object.values(REGIONS).flatMap(r => r.symptoms);
+            const pSyms = p.symptoms.map(id => allSym.find(s => s.id === id)).filter(Boolean);
+            const result = analyzeSymptoms(pSyms);
+            if (!result) { simIndex++; return; }
+            result.timeElapsed = (Math.random()*2+0.5).toFixed(1);
+            result.symptomsList = pSyms.map(s => s.name);
+            lastResult = result;
+
+            const triColor = result.triageLevel==='CRITICAL'?'var(--critical)':result.triageLevel==='URGENT'?'var(--urgent)':result.triageLevel==='SEMI-URGENT'?'var(--semi)':'var(--non)';
+            const card = document.createElement('div');
+            card.className = 'patient-card';
+            card.innerHTML = `<div class="patient-triage-dot" style="background:${triColor};"></div><div style="flex:1;"><div style="font-weight:600;">${p.name} <span style="color:var(--muted);font-weight:400;">${p.age}${p.gender}</span></div><div style="font-size:9px;color:var(--muted);">${pSyms.map(s=>s.name.split(' ')[0]).join(', ')}</div></div><div style="font-size:9px;font-weight:700;color:${triColor};">${result.triageLevel}</div>`;
+            document.getElementById('patient-queue').prepend(card);
+            displayResults(result);
+            updateStats(result.triageLevel);
+            updateChart();
+            document.getElementById('report-btn').style.display = 'flex';
+            const regionForPatient = Object.entries(REGIONS).find(([k,r])=>r.symptoms.some(s=>p.symptoms.includes(s.id)));
+            if (regionForPatient) highlightHotspot(regionForPatient[0]);
+            simIndex++;
+        }
+
+        // ============================================================
+        // TOAST
+        // ============================================================
+        function showToast(msg, type='success') {
+            const c = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = `toast toast-${type}`;
+            t.innerHTML = `<i class="fas fa-${type==='success'?'check-circle':'exclamation-circle'}"></i> ${msg}`;
+            c.appendChild(t);
+            setTimeout(()=>t.classList.add('show'),10);
+            setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300);},3000);
+        }
+
+        // ============================================================
+        // THREE.JS — 3D HOLOGRAPHIC HUMAN BODY
+        // ============================================================
+        const canvas = document.getElementById('three-canvas');
+        const containerEl = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(40, containerEl.clientWidth/containerEl.clientHeight, 0.1, 100);
+        camera.position.set(0, 0.8, 3.2);
+        const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+        renderer.setSize(containerEl.clientWidth, containerEl.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setClearColor(0x000000, 0);
+        const controls = new OrbitControls(camera, canvas);
+        controls.enableDamping = true; controls.dampingFactor = 0.05;
+        controls.enablePan = false; controls.minDistance = 1.8; controls.maxDistance = 5;
+        controls.target.set(0, 0.7, 0); controls.update();
+
+        scene.add(new THREE.AmbientLight(0x223344, 0.8));
+        const dirLight = new THREE.DirectionalLight(0x00e5a0, 0.6);
+        dirLight.position.set(2, 3, 2); scene.add(dirLight);
+        const ptLight = new THREE.PointLight(0x00e5a0, 0.8, 5);
+        ptLight.position.set(0, 1, 1); scene.add(ptLight);
+
+        function generateHumanPoints(count) {
+            const pts = [];
+            for (let i = 0; i < count; i++) {
+                const seg = Math.random(); let x,y,z;
+                const r = () => (Math.random()-0.5)*0.02;
+                if (seg<0.12) { const t=Math.random()*Math.PI*2, p=Math.acos(2*Math.random()-1), rd=0.2*(0.92+Math.random()*0.08); x=rd*Math.sin(p)*Math.cos(t)+r(); y=rd*Math.cos(p)+1.55+r(); z=rd*Math.sin(p)*Math.sin(t)+r(); }
+                else if(seg<0.16) { const t=Math.random()*Math.PI*2, rd=0.065*(0.9+Math.random()*0.1); x=rd*Math.cos(t)+r(); y=1.3+Math.random()*0.12+r(); z=rd*Math.sin(t)+r(); }
+                else if(seg<0.42) { const t=Math.random(), th=Math.random()*Math.PI*2; y=1.22-t*0.65; const rx=0.24-t*0.04+Math.sin(t*Math.PI)*0.02, rz=0.13+Math.sin(t*Math.PI)*0.02, rad=0.9+Math.random()*0.1; x=rx*rad*Math.cos(th)+r(); z=rz*rad*Math.sin(th)+r(); }
+                else if(seg<0.55) { const t=Math.random(), th=Math.random()*Math.PI*2; y=1.12-t*0.6; const ax=-0.28-t*0.04, rad=Math.max(0.01,0.05*(1-t*0.3))*(0.9+Math.random()*0.1); x=ax+rad*Math.cos(th)+r(); z=rad*Math.sin(th)+r(); }
+                else if(seg<0.68) { const t=Math.random(), th=Math.random()*Math.PI*2; y=1.12-t*0.6; const ax=0.28+t*0.04, rad=Math.max(0.01,0.05*(1-t*0.3))*(0.9+Math.random()*0.1); x=ax+rad*Math.cos(th)+r(); z=rad*Math.sin(th)+r(); }
+                else if(seg<0.84) { const t=Math.random(), th=Math.random()*Math.PI*2; y=0.55-t*0.85; const rad=Math.max(0.01,0.075*(1-t*0.35))*(0.9+Math.random()*0.1); x=-0.1+rad*Math.cos(th)+r(); z=rad*Math.sin(th)+r(); }
+                else { const t=Math.random(), th=Math.random()*Math.PI*2; y=0.55-t*0.85; const rad=Math.max(0.01,0.075*(1-t*0.35))*(0.9+Math.random()*0.1); x=0.1+rad*Math.cos(th)+r(); z=rad*Math.sin(th)+r(); }
+                pts.push(x,y,z);
+            }
+            return new Float32Array(pts);
+        }
+
+        const humanGeo = new THREE.BufferGeometry();
+        humanGeo.setAttribute('position', new THREE.BufferAttribute(generateHumanPoints(2500), 3));
+        const humanMat = new THREE.ShaderMaterial({
+            transparent:true, depthWrite:false,
+            uniforms:{ uColor:{value:new THREE.Color(0x00e5a0)}, uTime:{value:0}, uGlowIntensity:{value:1.0} },
+            vertexShader:`uniform float uTime;uniform float uGlowIntensity;varying float vAlpha;void main(){vec3 pos=position;pos.x+=sin(pos.y*6.0+uTime*2.0)*0.008;pos.z+=cos(pos.y*4.0+uTime*1.5)*0.005;vec4 mv=modelViewMatrix*vec4(pos,1.0);gl_PointSize=(3.5+sin(uTime+pos.y*3.0)*0.8)*uGlowIntensity*(200.0/-mv.z);gl_Position=projectionMatrix*mv;vAlpha=0.6+0.3*sin(uTime*2.0+pos.y*5.0);}`,
+            fragmentShader:`uniform vec3 uColor;varying float vAlpha;void main(){float d=length(gl_PointCoord-vec2(0.5));if(d>0.5)discard;float g=1.0-smoothstep(0.0,0.5,d);gl_FragColor=vec4(uColor,g*vAlpha*0.85);}`
+        });
+        const humanMesh = new THREE.Points(humanGeo, humanMat);
+        scene.add(humanMesh);
+
+        const scanRing = new THREE.Mesh(new THREE.RingGeometry(0.45,0.5,64), new THREE.MeshBasicMaterial({color:0x00e5a0,transparent:true,opacity:0.25,side:THREE.DoubleSide}));
+        scanRing.rotation.x = Math.PI/2; scene.add(scanRing);
+
+        [0,1,2].forEach(i=>{
+            const t = new THREE.Mesh(new THREE.TorusGeometry(0.55+i*0.15,0.003,8,100), new THREE.MeshBasicMaterial({color:i===0?0x00e5a0:i===1?0x00c4d4:0x00e5a0,transparent:true,opacity:0.12-i*0.03}));
+            t.rotation.x=Math.PI/2+i*0.15; t.rotation.z=i*0.3; t.position.y=0.8; t.userData.rotSpeed=0.2+i*0.15; scene.add(t);
+        });
+
+        const gridH = new THREE.GridHelper(3,20,0x0a3325,0x061a14);
+        gridH.position.y = -0.35; scene.add(gridH);
+
+        const aCount=400, aGeo=new THREE.BufferGeometry(), aPos=new Float32Array(aCount*3), aVel=[];
+        for(let i=0;i<aCount;i++){aPos[i*3]=(Math.random()-0.5)*3;aPos[i*3+1]=Math.random()*2.5-0.3;aPos[i*3+2]=(Math.random()-0.5)*3;aVel.push({x:(Math.random()-0.5)*0.002,y:(Math.random()-0.5)*0.002,z:(Math.random()-0.5)*0.002});}
+        aGeo.setAttribute('position',new THREE.BufferAttribute(aPos,3));
+        scene.add(new THREE.Points(aGeo,new THREE.PointsMaterial({color:0x00c4d4,size:0.012,transparent:true,opacity:0.4,sizeAttenuation:true})));
+
+        // Hotspots
+        const hsData=[{region:'head',pos:[0,1.55,0.18],color:0xa78bfa},{region:'chest',pos:[0,1.0,0.2],color:0xf472b6},{region:'abdomen',pos:[0,0.6,0.15],color:0xfbbf24},{region:'limbs',pos:[-0.35,0.85,0],color:0x34d399},{region:'limbs',pos:[0.35,0.85,0],color:0x34d399},{region:'limbs',pos:[-0.1,0.15,0.1],color:0x34d399},{region:'limbs',pos:[0.1,0.15,0.1],color:0x34d399},{region:'skin',pos:[0.25,1.1,0.12],color:0xfb923c}];
+        const hsMeshes=[], hsRings=[];
+        hsData.forEach(h=>{
+            const hit=new THREE.Mesh(new THREE.SphereGeometry(0.1,8,8),new THREE.MeshBasicMaterial({visible:false}));
+            hit.position.set(...h.pos); hit.userData.region=h.region; scene.add(hit); hsMeshes.push(hit);
+            const ring=new THREE.Mesh(new THREE.RingGeometry(0.03,0.055,24),new THREE.MeshBasicMaterial({color:h.color,transparent:true,opacity:0.6,side:THREE.DoubleSide}));
+            ring.position.set(...h.pos); ring.lookAt(camera.position); ring.userData.baseColor=h.color; ring.userData.region=h.region; scene.add(ring); hsRings.push(ring);
+            const dot=new THREE.Mesh(new THREE.SphereGeometry(0.015,8,8),new THREE.MeshBasicMaterial({color:h.color,transparent:true,opacity:0.9}));
+            dot.position.set(...h.pos); scene.add(dot);
+        });
+
+        function highlightHotspot(rk){hsRings.forEach(r=>{if(r.userData.region===rk){r.material.opacity=1;r.scale.setScalar(1.8);}else{r.material.opacity=0.15;r.scale.setScalar(0.8);}});}
+        function clearHotspotHighlight(){hsRings.forEach(r=>{r.material.opacity=0.6;r.scale.setScalar(1);});}
+        function triggerBodyGlow(tl){const c=tl==='CRITICAL'?0xff3355:tl==='URGENT'?0xff8c20:tl==='SEMI-URGENT'?0xffd020:0x40d87a;humanMat.uniforms.uColor.value.set(c);humanMat.uniforms.uGlowIntensity.value=2.5;setTimeout(()=>{humanMat.uniforms.uColor.value.set(0x00e5a0);humanMat.uniforms.uGlowIntensity.value=1.0;},2000);}
+
+        const raycaster=new THREE.Raycaster(), mouse=new THREE.Vector2();
+        let hoveredRegion=null;
+        canvas.addEventListener('mousemove',(e)=>{const r=canvas.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;});
+        canvas.addEventListener('click',(e)=>{const r=canvas.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;raycaster.setFromCamera(mouse,camera);const hits=raycaster.intersectObjects(hsMeshes);if(hits.length>0){selectRegion(hits[0].object.userData.region);showToast(`Region: ${REGIONS[hits[0].object.userData.region].name}`,'success');}});
+
+        const clock = new THREE.Clock();
+        function animate(){
+            requestAnimationFrame(animate);
+            const t=clock.getElapsedTime();
+            humanMat.uniforms.uTime.value=t;
+            scanRing.position.y=-0.3+((Math.sin(t*0.5)+1)/2)*2.0;
+            scanRing.material.opacity=0.15+Math.sin(t*2)*0.1;
+            scene.children.forEach(c=>{if(c.userData.rotSpeed)c.rotation.z+=c.userData.rotSpeed*0.005;});
+            hsRings.forEach((r,i)=>{r.lookAt(camera.position);if(r.scale.x<1.5)r.scale.setScalar(1+Math.sin(t*3+i)*0.2);});
+            const ap=aGeo.attributes.position.array;
+            for(let i=0;i<aCount;i++){ap[i*3]+=aVel[i].x;ap[i*3+1]+=aVel[i].y;ap[i*3+2]+=aVel[i].z;if(Math.abs(ap[i*3])>1.5)aVel[i].x*=-1;if(ap[i*3+1]>2.5||ap[i*3+1]<-0.3)aVel[i].y*=-1;if(Math.abs(ap[i*3+2])>1.5)aVel[i].z*=-1;}
+            aGeo.attributes.position.needsUpdate=true;
+            raycaster.setFromCamera(mouse,camera);
+            const hv=raycaster.intersectObjects(hsMeshes);
+            if(hv.length>0){canvas.style.cursor='pointer';const hr=hv[0].object.userData.region;if(hr!==hoveredRegion){hoveredRegion=hr;hsRings.forEach(r=>{if(r.userData.region===hr&&r.scale.x<1.5)r.material.opacity=1;});}}
+            else{canvas.style.cursor='grab';if(hoveredRegion){hoveredRegion=null;hsRings.forEach(r=>{if(r.scale.x<1.5)r.material.opacity=0.6;});}}
+            humanMesh.rotation.y=Math.sin(t*0.3)*0.08;
+            controls.update();
+            renderer.render(scene,camera);
+        }
+        animate();
+
+        window.addEventListener('resize',()=>{const w=containerEl.clientWidth,h=containerEl.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);});
+
+        setTimeout(()=>document.getElementById('loader').classList.add('hidden'),2200);
+    </script>
+</body>
+</html>
